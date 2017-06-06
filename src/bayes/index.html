@@ -131,8 +131,9 @@
                     .attr("d", function(d) {
                         var path = d3.path()
                         path.moveTo(xDiscrete(d.name), y(0));
-                        path.lineTo(xDiscrete(d.name), y(d.value));
-                        path.lineTo(xDiscrete(d.name) + xDiscrete.bandwidth(), y(d.value));
+                        for (i=0; i<fidelity; i++) {
+                            path.lineTo(xDiscrete(d.name) + i*xDiscrete.bandwidth()/(fidelity-1), y(d.value))
+                        }
                         path.lineTo(xDiscrete(d.name) + xDiscrete.bandwidth(), y(0));
                         return path.toString();
                     });
