@@ -86,63 +86,80 @@
 
 
             //populate the data
-            var distParams = {mean:8, sigma:8, min:-20, max:36};
-            var dataContinuous = [];
-            var x, xStd, y, color;
-            for (i = 0; i < fidelity; i++) {
-                
-                x = distParams.min + i*(distParams.max - distParams.min)/(fidelity-1);
-                xStd = (x - distParams.mean) / distParams.sigma;
-                y = gaussianConstant * Math.exp(-.5 * xStd * xStd) / distParams.sigma;
-
-                if (x <= -5) {
-                    color = "red";
-                } else if (x <= 5) {
-                    color = "blue";
-                } else {
-                    color = "green";
-                }
-
-                el = {
-                    x: x,
-                    y: y,
-                    color: color
-                };
-
-                dataContinuous.push(el);
-            };
+            var distParams = {mean:8, sigma:8, min:-20, max:36, cuts:[-5, 5, 36]};
 
             var dataContinuousGroups = [];
-            dataContinuous.forEach(function(d, i, a) {
-                if (a[i - 1] === undefined || (a[i - 1].color !== a[i].color)) {
-                    if (a[i - 1] !== undefined) {
-                        dataContinuousGroups[dataContinuousGroups.length - 1].data.push({
-                            x: a[i - 1].x,
-                            y: 0,
-                            color: a[i - 1].color
+            var x, xStd, y;
+            for (c = 0; c < distParams.cuts.length; c++) {
+                dataContinuousGroups.push({
+                    color: dataDiscrete[c].color,
+                    data: []
+                });
+
+                for (i = 0; i < fidelity; i++) {
+                    if (c === 0) {
+                        x = distParams.min + i*(distParams.cuts[c] - distParams.min)/(fidelity-1);
+                    } else {
+                        x = distParams.cuts[c - 1] + i*(distParams.cuts[c] - distParams.cuts[c - 1])/(fidelity-1);
+                    }
+                    
+                    xStd = (x - distParams.mean) / distParams.sigma;
+                    y = gaussianConstant * Math.exp(-.5 * xStd * xStd) / distParams.sigma;
+
+                    el = {
+                        x: x,
+                        y: y
+                    };
+
+                    if (i === 0) {
+                        dataContinuousGroups[c].data.push({
+                            x: x,
+                            y: 0
                         });
                     }
-                    dataContinuousGroups.push({
-                        color: d.color,
-                        data: []
-                    });
-                    dataContinuousGroups[dataContinuousGroups.length - 1].data.push({
-                        x: d.x,
-                        y: 0,
-                        color: d.color
-                    });
-                }
+
+                    dataContinuousGroups[c].data.push(el);
+
+                    if (i === fidelity - 1) {
+                        dataContinuousGroups[c].data.push({
+                            x: x,
+                            y: 0
+                        });
+                    }
+                };
+            }
+
+            // var dataContinuousGroups = [];
+            // dataContinuous.forEach(function(d, i, a) {
+            //     if (a[i - 1] === undefined || (a[i - 1].color !== a[i].color)) {
+            //         if (a[i - 1] !== undefined) {
+            //             dataContinuousGroups[dataContinuousGroups.length - 1].data.push({
+            //                 x: a[i - 1].x,
+            //                 y: 0,
+            //                 color: a[i - 1].color
+            //             });
+            //         }
+            //         dataContinuousGroups.push({
+            //             color: d.color,
+            //             data: []
+            //         });
+            //         dataContinuousGroups[dataContinuousGroups.length - 1].data.push({
+            //             x: d.x,
+            //             y: 0,
+            //             color: d.color
+            //         });
+            //     }
                 
-                dataContinuousGroups[dataContinuousGroups.length - 1].data.push(d);
+            //     dataContinuousGroups[dataContinuousGroups.length - 1].data.push(d);
                 
-                if (i === a.length - 1) {
-                    dataContinuousGroups[dataContinuousGroups.length - 1].data.push({
-                        x: d.x,
-                        y: 0,
-                        color: d.color
-                    });
-                }
-            });
+            //     if (i === a.length - 1) {
+            //         dataContinuousGroups[dataContinuousGroups.length - 1].data.push({
+            //             x: d.x,
+            //             y: 0,
+            //             color: d.color
+            //         });
+            //     }
+            // });
 
             console.log(dataContinuousGroups);
 
@@ -227,10 +244,9 @@
 
             d3.selectAll(".toggler").on("change", function() {
                 var toggleVal = d3.select('.toggler:checked').node().value;
-                console.log(toggleVal);
 
                 if (toggleVal === "distribution") {
-                    updateYAxis(dataContinuous, 1000);
+                    updateYAxis(dataContinuousGroups[0].data.concat(dataContinuousGroups[1].data).concat(dataContinuousGroups[2].data), 1000);
                     updateXAxis("continuous", 1000);
 
                     areas
@@ -245,8 +261,6 @@
                                     .y(function(p) {
                                         return y(p.y);
                                     });
-                                console.log(d)
-                                console.log(d.data)
                                 return gen(d.data);
                             });
 
@@ -271,188 +285,6 @@
                 
 
             });
-
-            // svg.append("path")
-            //     .attr("class", "line")
-            //     .attr("id", "dist-curve");
-
-            // svg.append("path")
-            //     .attr("class", "line-hide")
-            //     .attr("id", "dist-curve-temp");
-
-            // var line = d3.line()
-            //     .x(function(d) {
-            //         return x(d.q);
-            //     })
-            //     .y(function(d) {
-            //         return y(d.p);
-            //     }); 
-
-            // var settings = {};
-
-            // var updatePath = function(data, duration) {
-            //     d3.select("#dist-curve")
-            //         .datum(data)
-            //         .transition()
-            //         .duration(duration)
-            //         .attrTween('d', function (d) {
-            //             var previous = d3.select(this).attr('d');
-            //             var current = line(d);
-            //             return d3.interpolatePath(previous, current);
-            //         });
-            // };
-
-            // var updateParams = function() {
-            //     settings.distribution = d3.select("#distselect").property("value");
-            //     settings.mean = Number(d3.select("#meanbox").property("value"));
-            //     settings.stdev = Number(d3.select("#stdevbox").property("value")); 
-            //     settings.updateAxes = d3.select("#axisscalecheck").property("checked"); 
-            // };
-
-            
-
-            
-
-            // var getData = function() {
-
-            //     var oldData = d3.select("#dist-curve").datum();
-
-            //     data = []; //erase current data
-
-            //     //populate the data
-            //     for (i = 0; i < width; i++) {
-            //         q = x.invert(i);
-            //         p = distributions[settings.distribution].pdf(q, settings.mean, settings.stdev); 
-            //         el = {
-            //             "q": q,
-            //             "p": p
-            //         }
-            //         if (p > 0) {
-            //             data.push(el);
-            //         }
-            //     };
-
-            //     data.unshift({
-            //         "q": data[0].q,
-            //         "p": 0
-            //     });
-
-            //     data.push({
-            //         "q": data[data.length - 1].q,
-            //         "p": 0
-            //     });
-
-            //     return data;
-
-            // };
-
-            // var smoothPoints = function(path) {
-            //     var totLength = path.node().getTotalLength();
-            //     var segLength = totLength / fidelity;
-            //     var data = [];
-            //     for (i=0; i<=fidelity; i++) {
-            //         var p = path.node().getPointAtLength(i * segLength);
-            //         data.push({
-            //             "q": x.invert(p.x),
-            //             "p": y.invert(p.y)
-            //         });
-            //     }
-            //     return data;
-            // };
-            
-            var distributions = {
-                uniform: {
-                    pdf: function(x, mean, sigma) {
-                        if (mean - sigma*Math.sqrt(3) < x && x < mean + sigma*Math.sqrt(3)) {
-                            return 1/(2*sigma*Math.sqrt(3));
-                        } else {
-                            return 0;
-                        }
-                    },
-                    constrain: function(mean, sigma) {
-
-                    },
-                    definedOn: function(mean, sigma) {
-                        return [mean - sigma*Math.sqrt(3), mean + sigma*Math.sqrt(3)];
-                    }
-                },
-
-                normal: {
-                    pdf: function(x, mean, sigma) {
-                        var gaussianConstant = 1 / Math.sqrt(2 * Math.PI),
-                        x = (x - mean) / sigma;
-                        return gaussianConstant * Math.exp(-.5 * x * x) / sigma;
-                    },
-                    constrain: function(mean, sigma) {
-
-                    },
-                    definedOn: function(mean, sigma) {
-                        return [mean - 3*sigma, mean + 3*sigma];
-                    }
-                },
-
-                logNormal: {
-                    pdf: function(x, mean, sigma) {
-                        // mean must be > 0
-                        var mu = ln(mean/sqrt(1 + pow(sigma,2)/pow(mean,2)));
-                        var sig = sqrt(ln(1 + pow(sigma,2)/pow(mean,2)));
-
-                        if ( x <= 0 ) {
-                            return 0;
-                        }
-                        var s2 = pow( sig, 2 ),
-                            A = 1 / ( sqrt( 2 * s2 * PI ) ),
-                            B = - 1 / ( 2 * s2 );
-                        return (1/x) * A * exp( B * pow( ln( x ) - mu, 2 ) );
-                    },
-                    constrain: function(mean, sigma) {
-
-                    },
-                    definedOn: function(mean, sigma) {
-                        return [0, mean + 3*sigma];
-                    }
-                },
-
-                exponential: {
-                    pdf: function(x, mean, sigma) {
-                        // mean must equal sd, both > 0
-                        if (x <= 0) {
-                            return 0;
-                        } else {
-                            return (1/mean)*exp(-x/mean);
-                        }
-                    },
-                    constrain: function(mean, sigma) {
-
-                    },
-                    definedOn: function(mean, sigma) {
-                        return [0, -mean*ln(0.01)];
-                    }
-                }
-            };
-            
-            // updateParams();
-            // updateXAxis(0);
-            // var data = getData();
-            // updateYAxis(data, 0);
-            // var newPathTest = d3.select("#dist-curve-temp")
-            //     .datum(data)
-            //     .attr('d', line);
-            // updatePath(smoothPoints(newPathTest), 0);
-            
-            // d3.select("#update-button").on("click", function() {
-            //     updateParams();
-                
-            //     if (settings.updateAxes) { updateXAxis(transDuration); }
-            //     var data = getData();
-            //     if (settings.updateAxes) { updateYAxis(data, transDuration); }
-
-            //     var newPathTest = d3.select("#dist-curve-temp")
-            //         .datum(data)
-            //         .attr('d', line);
-
-            //     updatePath(smoothPoints(newPathTest), transDuration);
-            // });
 
         </script>
 
