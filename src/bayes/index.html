@@ -205,7 +205,7 @@
                     top: 20,
                     right: 20,
                     bottom: 30,
-                    left: 50
+                    left: 70
                 },
                 width = 960 - margin.left - margin.right,
                 height = 450 - margin.top - margin.bottom;
@@ -235,6 +235,16 @@
                 .scale(y)
                 .ticks(10)
                 .tickFormat(d3.format(".0%"));
+
+            var yLabel = svg.append("text")
+                .attr("class", "y-axis-label")
+                .attr("transform", "rotate(-90)")
+                .attr("y", -52)
+                .attr("x", -160)
+                .attr("dy", ".71em")
+                .style("text-anchor", "end")
+                .style("font-size", 14 + "px")
+                .text("Probability");
                 
             svg.append("g")
                 .attr("class", "x axis")
@@ -334,6 +344,9 @@
                     svg.select(".y.axis")
                             .style("opacity", 0);
 
+                    svg.select(".y-axis-label")
+                            .style("opacity", 0);
+
                 } else {
                     updateYAxis(dataDiscrete, 0);
                     updateXAxis("discrete", 1000);
@@ -359,6 +372,12 @@
                             .style("opacity", 1);
 
                     svg.select(".y.axis")
+                        .transition()
+                        .duration(0)
+                        .delay(transDuration)
+                            .style("opacity", 1);
+
+                    svg.select(".y-axis-label")
                         .transition()
                         .duration(0)
                         .delay(transDuration)
