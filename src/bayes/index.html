@@ -79,42 +79,72 @@
             var gaussianConstant = 1 / Math.sqrt(2 * Math.PI);
 
             var dataDiscrete = [
-                {name: "A", color: "red", value: 0.0500},
-                {name: "B", color: "blue", value: 0.2560},
-                {name: "C", color: "green", value: 0.6940},
+                {x: "A", y: 0.0500, color: "red"},
+                {x: "B", y: 0.2560, color: "blue"},
+                {x: "C", y: 0.6940, color: "green"},
             ];
 
-            var distParams = {mean:8, sigma:8, min:-20, max:36};
 
-            var dataContinuous = [];
-            
             //populate the data
-            var x, xStd, y;
+            var distParams = {mean:8, sigma:8, min:-20, max:36};
+            var dataContinuous = [];
+            var x, xStd, y, color;
             for (i = 0; i < fidelity; i++) {
                 
                 x = distParams.min + i*(distParams.max - distParams.min)/(fidelity-1);
                 xStd = (x - distParams.mean) / distParams.sigma;
                 y = gaussianConstant * Math.exp(-.5 * xStd * xStd) / distParams.sigma;
 
+                if (x <= -5) {
+                    color = "red";
+                } else if (x <= 5) {
+                    color = "blue";
+                } else {
+                    color = "green";
+                }
+
                 el = {
-                    "x": x,
-                    "y": y
+                    x: x,
+                    y: y,
+                    color: color
                 };
 
                 dataContinuous.push(el);
             };
 
-            dataContinuous.unshift({
-                "x": dataContinuous[0].x,
-                "y": 0
+            var dataContinuousGroups = [];
+            dataContinuous.forEach(function(d, i, a) {
+                if (a[i - 1] === undefined || (a[i - 1].color !== a[i].color)) {
+                    if (a[i - 1] !== undefined) {
+                        dataContinuousGroups[dataContinuousGroups.length - 1].data.push({
+                            x: a[i - 1].x,
+                            y: 0,
+                            color: a[i - 1].color
+                        });
+                    }
+                    dataContinuousGroups.push({
+                        color: d.color,
+                        data: []
+                    });
+                    dataContinuousGroups[dataContinuousGroups.length - 1].data.push({
+                        x: d.x,
+                        y: 0,
+                        color: d.color
+                    });
+                }
+                
+                dataContinuousGroups[dataContinuousGroups.length - 1].data.push(d);
+                
+                if (i === a.length - 1) {
+                    dataContinuousGroups[dataContinuousGroups.length - 1].data.push({
+                        x: d.x,
+                        y: 0,
+                        color: d.color
+                    });
+                }
             });
 
-            dataContinuous.push({
-                "x": dataContinuous[dataContinuous.length - 1].x,
-                "y": 0
-            });
-
-
+            console.log(dataContinuousGroups);
 
 
             var margin = {
@@ -126,14 +156,12 @@
                 width = 960 - margin.left - margin.right,
                 height = 450 - margin.top - margin.bottom;
 
-            
-
             var xContinuous = d3.scaleLinear()
                 .domain([distParams.min, distParams.max])
                 .range([0, width]);
 
             var xDiscrete = d3.scaleBand()
-                .domain(dataDiscrete.map(function(d) { return d.name; }))
+                .domain(dataDiscrete.map(function(d) { return d.x; }))
                 .rangeRound([0, width]).padding(0.1);
 
             var y = d3.scaleLinear()
@@ -168,18 +196,79 @@
                     .style("fill", function(d) { return d.color; })
                     .attr("d", function(d) {
                         var path = d3.path()
-                        path.moveTo(xDiscrete(d.name), y(0));
+                        path.moveTo(xDiscrete(d.x), y(0));
                         for (i=0; i<fidelity; i++) {
-                            path.lineTo(xDiscrete(d.name) + i*xDiscrete.bandwidth()/(fidelity-1), y(d.value))
+                            path.lineTo(xDiscrete(d.x) + i*xDiscrete.bandwidth()/(fidelity-1), y(d.y))
                         }
-                        path.lineTo(xDiscrete(d.name) + xDiscrete.bandwidth(), y(0));
+                        path.lineTo(xDiscrete(d.x) + xDiscrete.bandwidth(), y(0));
                         return path.toString();
                     });
+
+
+            var updateXAxis = function(type, duration) {
+                if (type === "continuous") {
+                    xAxis.scale(xContinuous);
+                } else {
+                    xAxis.scale(xDiscrete);
+                }
+                d3.select(".x").transition().duration(duration).call(xAxis);       
+            };
+
+            var updateYAxis = function(data, duration) {
+                var extent = d3.extent(data, function(d) {
+                    return d.y;
+                });
+                extent[0] = 0;
+                extent[1] = extent[1] + 0.2*(extent[1] - extent[0]);
+                y.domain(extent);
+                d3.select(".y").transition().duration(duration).call(yAxis);
+            };
 
 
             d3.selectAll(".toggler").on("change", function() {
                 var toggleVal = d3.select('.toggler:checked').node().value;
                 console.log(toggleVal);
+
+                if (toggleVal === "distribution") {
+                    updateYAxis(dataContinuous, 1000);
+                    updateXAxis("continuous", 1000);
+
+                    areas
+                        .data(dataContinuousGroups)
+                        .transition()
+                        .duration(transDuration)
+                            .attr("d", function(d) {
+                                var gen = d3.line()
+                                    .x(function(p) {
+                                        return xContinuous(p.x);
+                                    })
+                                    .y(function(p) {
+                                        return y(p.y);
+                                    });
+                                console.log(d)
+                                console.log(d.data)
+                                return gen(d.data);
+                            });
+
+                } else {
+                    updateYAxis(dataDiscrete, 1000);
+                    updateXAxis("discrete", 1000);
+
+                    areas
+                        .data(dataDiscrete)
+                        .transition()
+                        .duration(transDuration)
+                            .attr("d", function(d) {
+                                var path = d3.path()
+                                path.moveTo(xDiscrete(d.x), y(0));
+                                for (i=0; i<fidelity; i++) {
+                                    path.lineTo(xDiscrete(d.x) + i*xDiscrete.bandwidth()/(fidelity-1), y(d.y))
+                                }
+                                path.lineTo(xDiscrete(d.x) + xDiscrete.bandwidth(), y(0));
+                                return path.toString();
+                            });
+                }
+                
 
             });
 
@@ -220,22 +309,9 @@
             //     settings.updateAxes = d3.select("#axisscalecheck").property("checked"); 
             // };
 
-            // var updateXAxis = function(duration) {
-            //     var definedOn = distributions[settings.distribution].definedOn(settings.mean, settings.stdev);
-            //     var totRange = definedOn[1] - definedOn[0];
-            //     var domain = [definedOn[0] - 0.2*totRange, definedOn[1] + 0.2*totRange]
-            //     x.domain(domain);
-            //     d3.select(".x").transition().duration(duration).call(xAxis);       
-            // };
+            
 
-            // var updateYAxis = function(data, duration) {
-            //     var extent = d3.extent(data, function(d) {
-            //         return d.p;
-            //     });
-            //     extent[1] = Math.max(1, extent[1]);
-            //     y.domain(extent);
-            //     d3.select(".y").transition().duration(duration).call(yAxis);
-            // };
+            
 
             // var getData = function() {
 
