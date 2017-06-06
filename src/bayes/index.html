@@ -57,24 +57,65 @@
     <body>
         <form onsubmit="return false">
             <p class="input">
-                <input type="radio" name="toggle" value="discrete" checked> Discrete Probabilities
-                <input type="radio" name="toggle" value="distribution"> Distribution
+                <input class="toggler" type="radio" name="toggle" value="discrete" checked> Discrete Probabilities
+                <input class="toggler" type="radio" name="toggle" value="distribution"> Distribution
             </p>
         </form>
 
         <script>
 
-            var data = [
-                {name: "A", color: "red", value: 0.0500},
-                {name: "B", color: "blue", value: 0.2560},
-                {name: "C", color: "green", value: 0.6940},
-            ];
+            //transition
+            var transDuration = 1000;
+
+            // fidelity
+            var fidelity = 1000;
 
             var exp = Math.exp,
                 ln = Math.log,
                 pow = Math.pow,
                 sqrt = Math.sqrt
                 PI = Math.PI;
+
+            var gaussianConstant = 1 / Math.sqrt(2 * Math.PI);
+
+            var dataDiscrete = [
+                {name: "A", color: "red", value: 0.0500},
+                {name: "B", color: "blue", value: 0.2560},
+                {name: "C", color: "green", value: 0.6940},
+            ];
+
+            var distParams = {mean:8, sigma:8, min:-20, max:36};
+
+            var dataContinuous = [];
+            
+            //populate the data
+            var x, xStd, y;
+            for (i = 0; i < fidelity; i++) {
+                
+                x = distParams.min + i*(distParams.max - distParams.min)/(fidelity-1);
+                xStd = (x - distParams.mean) / distParams.sigma;
+                y = gaussianConstant * Math.exp(-.5 * xStd * xStd) / distParams.sigma;
+
+                el = {
+                    "x": x,
+                    "y": y
+                };
+
+                dataContinuous.push(el);
+            };
+
+            dataContinuous.unshift({
+                "x": dataContinuous[0].x,
+                "y": 0
+            });
+
+            dataContinuous.push({
+                "x": dataContinuous[dataContinuous.length - 1].x,
+                "y": 0
+            });
+
+
+
 
             var margin = {
                     top: 20,
@@ -85,17 +126,14 @@
                 width = 960 - margin.left - margin.right,
                 height = 450 - margin.top - margin.bottom;
 
-            //transition
-            var transDuration = 1000;
+            
 
-            // fidelity
-            var fidelity = 1000;
-
-            var xLinear = d3.scaleLinear()
+            var xContinuous = d3.scaleLinear()
+                .domain([distParams.min, distParams.max])
                 .range([0, width]);
 
             var xDiscrete = d3.scaleBand()
-                .domain(data.map(function(d) { return d.name; }))
+                .domain(dataDiscrete.map(function(d) { return d.name; }))
                 .rangeRound([0, width]).padding(0.1);
 
             var y = d3.scaleLinear()
@@ -123,8 +161,8 @@
                 .attr("class", "y axis")
                 .call(yAxis);
 
-            var bars = svg.selectAll(".area")
-                .data(data)
+            var areas = svg.selectAll(".area")
+                .data(dataDiscrete)
                 .enter().append("path")
                     .attr("class", "area")
                     .style("fill", function(d) { return d.color; })
@@ -137,6 +175,13 @@
                         path.lineTo(xDiscrete(d.name) + xDiscrete.bandwidth(), y(0));
                         return path.toString();
                     });
+
+
+            d3.selectAll(".toggler").on("change", function() {
+                var toggleVal = d3.select('.toggler:checked').node().value;
+                console.log(toggleVal);
+
+            });
 
             // svg.append("path")
             //     .attr("class", "line")
@@ -239,76 +284,76 @@
             //     return data;
             // };
             
-            // var distributions = {
-            //     uniform: {
-            //         pdf: function(x, mean, sigma) {
-            //             if (mean - sigma*Math.sqrt(3) < x && x < mean + sigma*Math.sqrt(3)) {
-            //                 return 1/(2*sigma*Math.sqrt(3));
-            //             } else {
-            //                 return 0;
-            //             }
-            //         },
-            //         constrain: function(mean, sigma) {
+            var distributions = {
+                uniform: {
+                    pdf: function(x, mean, sigma) {
+                        if (mean - sigma*Math.sqrt(3) < x && x < mean + sigma*Math.sqrt(3)) {
+                            return 1/(2*sigma*Math.sqrt(3));
+                        } else {
+                            return 0;
+                        }
+                    },
+                    constrain: function(mean, sigma) {
 
-            //         },
-            //         definedOn: function(mean, sigma) {
-            //             return [mean - sigma*Math.sqrt(3), mean + sigma*Math.sqrt(3)];
-            //         }
-            //     },
+                    },
+                    definedOn: function(mean, sigma) {
+                        return [mean - sigma*Math.sqrt(3), mean + sigma*Math.sqrt(3)];
+                    }
+                },
 
-            //     normal: {
-            //         pdf: function(x, mean, sigma) {
-            //             var gaussianConstant = 1 / Math.sqrt(2 * Math.PI),
-            //             x = (x - mean) / sigma;
-            //             return gaussianConstant * Math.exp(-.5 * x * x) / sigma;
-            //         },
-            //         constrain: function(mean, sigma) {
+                normal: {
+                    pdf: function(x, mean, sigma) {
+                        var gaussianConstant = 1 / Math.sqrt(2 * Math.PI),
+                        x = (x - mean) / sigma;
+                        return gaussianConstant * Math.exp(-.5 * x * x) / sigma;
+                    },
+                    constrain: function(mean, sigma) {
 
-            //         },
-            //         definedOn: function(mean, sigma) {
-            //             return [mean - 3*sigma, mean + 3*sigma];
-            //         }
-            //     },
+                    },
+                    definedOn: function(mean, sigma) {
+                        return [mean - 3*sigma, mean + 3*sigma];
+                    }
+                },
 
-            //     logNormal: {
-            //         pdf: function(x, mean, sigma) {
-            //             // mean must be > 0
-            //             var mu = ln(mean/sqrt(1 + pow(sigma,2)/pow(mean,2)));
-            //             var sig = sqrt(ln(1 + pow(sigma,2)/pow(mean,2)));
+                logNormal: {
+                    pdf: function(x, mean, sigma) {
+                        // mean must be > 0
+                        var mu = ln(mean/sqrt(1 + pow(sigma,2)/pow(mean,2)));
+                        var sig = sqrt(ln(1 + pow(sigma,2)/pow(mean,2)));
 
-            //             if ( x <= 0 ) {
-            //                 return 0;
-            //             }
-            //             var s2 = pow( sig, 2 ),
-            //                 A = 1 / ( sqrt( 2 * s2 * PI ) ),
-            //                 B = - 1 / ( 2 * s2 );
-            //             return (1/x) * A * exp( B * pow( ln( x ) - mu, 2 ) );
-            //         },
-            //         constrain: function(mean, sigma) {
+                        if ( x <= 0 ) {
+                            return 0;
+                        }
+                        var s2 = pow( sig, 2 ),
+                            A = 1 / ( sqrt( 2 * s2 * PI ) ),
+                            B = - 1 / ( 2 * s2 );
+                        return (1/x) * A * exp( B * pow( ln( x ) - mu, 2 ) );
+                    },
+                    constrain: function(mean, sigma) {
 
-            //         },
-            //         definedOn: function(mean, sigma) {
-            //             return [0, mean + 3*sigma];
-            //         }
-            //     },
+                    },
+                    definedOn: function(mean, sigma) {
+                        return [0, mean + 3*sigma];
+                    }
+                },
 
-            //     exponential: {
-            //         pdf: function(x, mean, sigma) {
-            //             // mean must equal sd, both > 0
-            //             if (x <= 0) {
-            //                 return 0;
-            //             } else {
-            //                 return (1/mean)*exp(-x/mean);
-            //             }
-            //         },
-            //         constrain: function(mean, sigma) {
+                exponential: {
+                    pdf: function(x, mean, sigma) {
+                        // mean must equal sd, both > 0
+                        if (x <= 0) {
+                            return 0;
+                        } else {
+                            return (1/mean)*exp(-x/mean);
+                        }
+                    },
+                    constrain: function(mean, sigma) {
 
-            //         },
-            //         definedOn: function(mean, sigma) {
-            //             return [0, -mean*ln(0.01)];
-            //         }
-            //     }
-            // };
+                    },
+                    definedOn: function(mean, sigma) {
+                        return [0, -mean*ln(0.01)];
+                    }
+                }
+            };
             
             // updateParams();
             // updateXAxis(0);
