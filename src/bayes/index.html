@@ -1,0 +1,328 @@
+<!DOCTYPE html><!-- saved from url=(0014)about:internet -->
+
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <style>
+
+        body {
+            font: 10pt sans-serif;
+        }
+
+        .axis path,
+        .axis line {
+            fill: none;
+            stroke: #000;
+            shape-rendering: crispEdges;
+        }
+
+        .line {
+            fill: steelblue;
+            stroke: none;
+            stroke-width: 1.5px;
+        }
+
+        .line-hide {
+            fill: none;
+            stroke: none;
+            stroke-width: 1.5px;
+            fill-opacity: 0.1;
+        }
+
+        .input {
+            font-size: 14pt;
+            margin: 5px;
+        }
+
+        p.input {
+            text-align: center;
+        }
+
+        label {
+            display: inline-block; 
+            text-align: right;
+        }
+
+        #update-button {
+            margin-left:50px;
+        }
+
+        </style>
+        <script src="https://d3js.org/d3.v4.min.js"></script>
+        <script src="d3-interpolate-path.min.js"></script>
+    </head>
+
+    <body>
+        <form onsubmit="return false">
+            <p class="input">
+                <label class="input" for="distselect">Distribution: </label>
+                <select class="input inputbox" id="distselect">
+                    <option value="uniform">Uniform</option>
+                    <option value="normal">Normal</option>
+                    <option value="logNormal">Log Normal</option>
+                    <option value="exponential">Exponential</option>
+                </select>
+                <label class="input" for="meanbox">Mean: </label>
+                <input class="input inputbox" type="text" id="meanbox" size="3" value="1"/>
+                <label class="input" for="stdevbox">Standard deviation:</label>
+                <input class="input inputbox" type="text" id="stdevbox" size="3" value="1"/>
+                <input class="input inputbox" type="checkbox" id="axisscalecheck" checked>Scale axes</input>
+                <button class="input inputbox" id="update-button">Update</button>
+            </p>
+        </form>
+
+        <script>
+
+            var exp = Math.exp,
+                ln = Math.log,
+                pow = Math.pow,
+                sqrt = Math.sqrt
+                PI = Math.PI;
+
+            var margin = {
+                    top: 20,
+                    right: 20,
+                    bottom: 30,
+                    left: 50
+                },
+                width = 960 - margin.left - margin.right,
+                height = 450 - margin.top - margin.bottom;
+
+            //transition
+            var transDuration = 1000;
+
+            // fidelity
+            var fidelity = 1000;
+
+            var xLinear = d3.scaleLinear()
+                .range([0, width]);
+
+            var xDiscrete = d3.scaleBand()
+                .rangeRound([0, width]).padding(0.1);
+
+            var y = d3.scaleLinear()
+                .range([height, 0]);
+
+
+
+            var xAxis = d3.axisBottom()
+                .scale(x);
+
+            var yAxis = d3.axisLeft()
+                .scale(y);
+                
+            var svg = d3.select("body").append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+            svg.append("g")
+                .attr("class", "x axis")
+                .attr("transform", "translate(0," + height + ")")
+                .call(xAxis);
+
+            svg.append("g")
+                .attr("class", "y axis")
+                .call(yAxis);
+
+            svg.append("path")
+                .attr("class", "line")
+                .attr("id", "dist-curve");
+
+            svg.append("path")
+                .attr("class", "line-hide")
+                .attr("id", "dist-curve-temp");
+
+            var line = d3.line()
+                .x(function(d) {
+                    return x(d.q);
+                })
+                .y(function(d) {
+                    return y(d.p);
+                }); 
+
+            var settings = {};
+
+            var updatePath = function(data, duration) {
+                d3.select("#dist-curve")
+                    .datum(data)
+                    .transition()
+                    .duration(duration)
+                    .attrTween('d', function (d) {
+                        var previous = d3.select(this).attr('d');
+                        var current = line(d);
+                        return d3.interpolatePath(previous, current);
+                    });
+            };
+
+            var updateParams = function() {
+                settings.distribution = d3.select("#distselect").property("value");
+                settings.mean = Number(d3.select("#meanbox").property("value"));
+                settings.stdev = Number(d3.select("#stdevbox").property("value")); 
+                settings.updateAxes = d3.select("#axisscalecheck").property("checked"); 
+            };
+
+            var updateXAxis = function(duration) {
+                var definedOn = distributions[settings.distribution].definedOn(settings.mean, settings.stdev);
+                var totRange = definedOn[1] - definedOn[0];
+                var domain = [definedOn[0] - 0.2*totRange, definedOn[1] + 0.2*totRange]
+                x.domain(domain);
+                d3.select(".x").transition().duration(duration).call(xAxis);       
+            };
+
+            var updateYAxis = function(data, duration) {
+                var extent = d3.extent(data, function(d) {
+                    return d.p;
+                });
+                extent[1] = Math.max(1, extent[1]);
+                y.domain(extent);
+                d3.select(".y").transition().duration(duration).call(yAxis);
+            };
+
+            var getData = function() {
+
+                var oldData = d3.select("#dist-curve").datum();
+
+                data = []; //erase current data
+
+                //populate the data
+                for (i = 0; i < width; i++) {
+                    q = x.invert(i);
+                    p = distributions[settings.distribution].pdf(q, settings.mean, settings.stdev); 
+                    el = {
+                        "q": q,
+                        "p": p
+                    }
+                    if (p > 0) {
+                        data.push(el);
+                    }
+                };
+
+                data.unshift({
+                    "q": data[0].q,
+                    "p": 0
+                });
+
+                data.push({
+                    "q": data[data.length - 1].q,
+                    "p": 0
+                });
+
+                return data;
+
+            };
+
+            var smoothPoints = function(path) {
+                var totLength = path.node().getTotalLength();
+                var segLength = totLength / fidelity;
+                var data = [];
+                for (i=0; i<=fidelity; i++) {
+                    var p = path.node().getPointAtLength(i * segLength);
+                    data.push({
+                        "q": x.invert(p.x),
+                        "p": y.invert(p.y)
+                    });
+                }
+                return data;
+            };
+            
+            var distributions = {
+                uniform: {
+                    pdf: function(x, mean, sigma) {
+                        if (mean - sigma*Math.sqrt(3) < x && x < mean + sigma*Math.sqrt(3)) {
+                            return 1/(2*sigma*Math.sqrt(3));
+                        } else {
+                            return 0;
+                        }
+                    },
+                    constrain: function(mean, sigma) {
+
+                    },
+                    definedOn: function(mean, sigma) {
+                        return [mean - sigma*Math.sqrt(3), mean + sigma*Math.sqrt(3)];
+                    }
+                },
+
+                normal: {
+                    pdf: function(x, mean, sigma) {
+                        var gaussianConstant = 1 / Math.sqrt(2 * Math.PI),
+                        x = (x - mean) / sigma;
+                        return gaussianConstant * Math.exp(-.5 * x * x) / sigma;
+                    },
+                    constrain: function(mean, sigma) {
+
+                    },
+                    definedOn: function(mean, sigma) {
+                        return [mean - 3*sigma, mean + 3*sigma];
+                    }
+                },
+
+                logNormal: {
+                    pdf: function(x, mean, sigma) {
+                        // mean must be > 0
+                        var mu = ln(mean/sqrt(1 + pow(sigma,2)/pow(mean,2)));
+                        var sig = sqrt(ln(1 + pow(sigma,2)/pow(mean,2)));
+
+                        if ( x <= 0 ) {
+                            return 0;
+                        }
+                        var s2 = pow( sig, 2 ),
+                            A = 1 / ( sqrt( 2 * s2 * PI ) ),
+                            B = - 1 / ( 2 * s2 );
+                        return (1/x) * A * exp( B * pow( ln( x ) - mu, 2 ) );
+                    },
+                    constrain: function(mean, sigma) {
+
+                    },
+                    definedOn: function(mean, sigma) {
+                        return [0, mean + 3*sigma];
+                    }
+                },
+
+                exponential: {
+                    pdf: function(x, mean, sigma) {
+                        // mean must equal sd, both > 0
+                        if (x <= 0) {
+                            return 0;
+                        } else {
+                            return (1/mean)*exp(-x/mean);
+                        }
+                    },
+                    constrain: function(mean, sigma) {
+
+                    },
+                    definedOn: function(mean, sigma) {
+                        return [0, -mean*ln(0.01)];
+                    }
+                }
+            };
+            
+            updateParams();
+            updateXAxis(0);
+            var data = getData();
+            updateYAxis(data, 0);
+            var newPathTest = d3.select("#dist-curve-temp")
+                .datum(data)
+                .attr('d', line);
+            updatePath(smoothPoints(newPathTest), 0);
+            
+            d3.select("#update-button").on("click", function() {
+                updateParams();
+                
+                if (settings.updateAxes) { updateXAxis(transDuration); }
+                var data = getData();
+                if (settings.updateAxes) { updateYAxis(data, transDuration); }
+
+                var newPathTest = d3.select("#dist-curve-temp")
+                    .datum(data)
+                    .attr('d', line);
+
+                updatePath(smoothPoints(newPathTest), transDuration);
+            });
+
+        </script>
+
+    </body>
+</html>
