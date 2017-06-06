@@ -224,7 +224,7 @@
                 var toggleVal = d3.select('.toggler:checked').node().value;
 
                 if (toggleVal === "distribution") {
-                    updateYAxis(dataContinuousGroups[0].data.concat(dataContinuousGroups[1].data).concat(dataContinuousGroups[2].data), 1000);
+                    updateYAxis(dataContinuousGroups[0].data.concat(dataContinuousGroups[1].data).concat(dataContinuousGroups[2].data), 0);
                     updateXAxis("continuous", 1000);
 
                     areas
@@ -243,12 +243,13 @@
                             });
 
                     thresholdLine
-                        .transition()
-                        .duration(transDuration)
+                            .style("opacity", 0);
+
+                    svg.select(".y.axis")
                             .style("opacity", 0);
 
                 } else {
-                    updateYAxis(dataDiscrete, 1000);
+                    updateYAxis(dataDiscrete, 0);
                     updateXAxis("discrete", 1000);
 
                     areas
@@ -267,7 +268,14 @@
 
                     thresholdLine
                         .transition()
-                        .duration(transDuration)
+                        .duration(0)
+                        .delay(transDuration)
+                            .style("opacity", 1);
+
+                    svg.select(".y.axis")
+                        .transition()
+                        .duration(0)
+                        .delay(transDuration)
                             .style("opacity", 1);
                 }
                 
