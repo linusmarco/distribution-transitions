@@ -315,18 +315,15 @@
                 d3.select(".y").transition().duration(duration).call(yAxis);
             };
 
-
-            d3.selectAll(".toggler").on("change", function() {
-                var toggleVal = d3.select('.toggler:checked').node().value;
-
-                if (toggleVal === "distribution") {
+            var toggle = function(to, duration) {
+                if (to === "distribution") {
                     updateYAxis(dataContinuousGroups[0].data.concat(dataContinuousGroups[1].data).concat(dataContinuousGroups[2].data), 0);
-                    updateXAxis("continuous", 1000);
+                    updateXAxis("continuous", duration);
 
                     areas
                         .data(dataContinuousGroups)
                         .transition()
-                        .duration(transDuration)
+                        .duration(duration)
                             .attr("d", function(d) {
                                 var gen = d3.line()
                                     .x(function(p) {
@@ -339,22 +336,22 @@
                             });
 
                     thresholdLine
-                            .style("opacity", 0);
+                        .style("opacity", 0);
 
                     svg.select(".y.axis")
-                            .style("opacity", 0);
+                        .style("opacity", 0);
 
                     svg.select(".y-axis-label")
-                            .style("opacity", 0);
+                        .style("opacity", 0);
 
                 } else {
                     updateYAxis(dataDiscrete, 0);
-                    updateXAxis("discrete", 1000);
+                    updateXAxis("discrete", duration);
 
                     areas
                         .data(dataDiscrete)
                         .transition()
-                        .duration(transDuration)
+                        .duration(duration)
                             .attr("d", function(d) {
                                 var path = d3.path()
                                 path.moveTo(xDiscrete(d.x), y(0));
@@ -368,23 +365,29 @@
                     thresholdLine
                         .transition()
                         .duration(0)
-                        .delay(transDuration)
+                        .delay(duration)
                             .style("opacity", 1);
 
                     svg.select(".y.axis")
                         .transition()
                         .duration(0)
-                        .delay(transDuration)
+                        .delay(duration)
                             .style("opacity", 1);
 
                     svg.select(".y-axis-label")
                         .transition()
                         .duration(0)
-                        .delay(transDuration)
+                        .delay(duration)
                             .style("opacity", 1);
                 }
-                
+            };
 
+            toggle("distribution", 0);
+            toggle("discrete", transDuration);
+
+            d3.selectAll(".toggler").on("change", function() {
+                var toggleVal = d3.select('.toggler:checked').node().value;
+                toggle(toggleVal, transDuration);
             });
 
         </script>
